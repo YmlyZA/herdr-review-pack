@@ -52,8 +52,14 @@ class CliTest(unittest.TestCase):
     def test_manifest_entrypoints_resolve(self):
         manifest = tomllib.loads((PLUGIN / "herdr-plugin.toml").read_text())
         self.assertEqual(manifest["id"], "herdr-review-pack")
-        for item in manifest["actions"] + manifest["panes"]:
+        for item in manifest["actions"]:
             self.assertTrue((PLUGIN / item["command"][1]).is_file())
+        for item in manifest["panes"]:
+            # Pane commands run in the reviewed repo's cwd; they must locate the
+            # script via HERDR_PLUGIN_ROOT rather than a relative path.
+            self.assertEqual(item["command"][:2], ["sh", "-c"])
+            self.assertIn("$HERDR_PLUGIN_ROOT/panel.sh", item["command"][2])
+            self.assertTrue((PLUGIN / "panel.sh").is_file())
         self.assertNotIn("startup", manifest)
         self.assertNotIn("events", manifest)
 

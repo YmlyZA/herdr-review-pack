@@ -1,0 +1,18 @@
+#!/bin/sh
+# Short entry point for Review Pack. Resolves the plugin directory from its own
+# location so it works from a Herdr install, a `herdr plugin link`, or a clone.
+#
+#   review-pack begin --brief task.md
+#   review-pack check -- npm test
+#   review-pack pack
+#
+# --repo defaults to the current directory's Git toplevel. The state directory
+# comes from REVIEW_PACK_STATE_DIR, then HERDR_PLUGIN_STATE_DIR, then
+# ~/.local/state/herdr-review-pack; pass --state-dir to override.
+self="$0"
+while [ -L "$self" ]; do
+  target=$(readlink "$self")
+  case "$target" in /*) self="$target" ;; *) self="$(dirname "$self")/$target" ;; esac
+done
+here=$(cd "$(dirname "$self")/.." && pwd)
+exec python3 "$here/review_pack.py" "$@"

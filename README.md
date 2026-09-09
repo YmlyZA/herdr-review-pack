@@ -3,8 +3,8 @@
 Prepare one coding task for human review: its explicit brief, current Git diff,
 and actual command receipts, with stale evidence clearly identified.
 
-**Alpha 0.1.0.** Local CLI tested on macOS; live Herdr pane integration and Linux
-smoke testing are still release gates. No usage or quality improvements have
+**Alpha 0.1.0.** Tested only on macOS with Python 3.14 (unit tests and a live Herdr
+0.9.0 popup run); Linux and Python 3.11–3.13 are untested. No usage or quality improvements have
 been measured. The plugin does not decide whether code is correct.
 
 ## A small workflow
@@ -24,7 +24,7 @@ input, not an inferred summary of a conversation.
 - Herdr 0.9.0+ for the pane; Python 3.11+, Git, macOS/Linux.
 - A Git worktree with at least one commit. One current task per worktree.
 - Optional `less` for scrolling. No Python packages or build toolchain required.
-- No submodules in v0; total tracked and non-ignored untracked content up to 64 MiB.
+- No submodules in v0. Fingerprinting is one `git hash-object` pass per snapshot; large binary files are hashed by Git, not read into Python.
 
 ## Install
 
@@ -75,12 +75,24 @@ override it. Otherwise, in a normal shell set `--state-dir` to the exact
 The standalone default is `~/.local/state/herdr-review-pack` (respects
 `XDG_STATE_HOME`). State must be outside the reviewed worktree.
 
+Put the wrapper on your PATH once (`bin/review-pack` inside the plugin directory):
+
 ```sh
-# Replace these paths. Options --repo and --state-dir go before the subcommand.
-python3 /path/to/herdr-review-pack/review_pack.py --repo /path/to/project --state-dir /path/to/plugin-state begin --brief /path/to/task.md
-python3 /path/to/herdr-review-pack/review_pack.py --repo /path/to/project --state-dir /path/to/plugin-state check --timeout 120 -- npm test
-python3 /path/to/herdr-review-pack/review_pack.py --repo /path/to/project --state-dir /path/to/plugin-state pack
+ln -s /path/to/herdr-review-pack/bin/review-pack ~/.local/bin/review-pack
 ```
+
+Then, from inside the project (options `--repo` and `--state-dir` go before the subcommand):
+
+```sh
+review-pack --state-dir /path/to/plugin-state begin --brief /path/to/task.md
+review-pack --state-dir /path/to/plugin-state check --timeout 120 -- npm test
+review-pack --state-dir /path/to/plugin-state pack
+```
+
+Coding agents will run checks through the wrapper if the repository tells them to;
+see [docs/AGENTS-SNIPPET.md](docs/AGENTS-SNIPPET.md) for a paste-ready block.
+`check` prints a one-line receipt summary on stdout and the full receipt JSON on
+stderr, and exits with the wrapped command's own exit code.
 
 `check` executes exactly the argv after `--`, in the repository root, with stdin
 closed. Shell operators need an explicitly requested shell, e.g. `-- sh -c

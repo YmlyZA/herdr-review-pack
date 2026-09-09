@@ -3,10 +3,22 @@
 ## Current state
 
 Publishing target: https://github.com/YmlyZA/herdr-review-pack (public alpha).
-Local CLI and panel-script tests pass on macOS/Python 3.14.7. No live Herdr
-integration or Linux run has been claimed. Publication is for early testing;
-do not describe this alpha as fully validated. Marketplace discovery must be
-confirmed separately after the repository topic is set.
+Local CLI and panel-script tests pass on macOS/Python 3.14.7.
+
+Live run on 2026-09-09, Herdr 0.9.0, macOS, in a dedicated `dev` Herdr session
+(`herdr --session dev`), driven through the CLI (`plugin link`, `plugin action
+invoke`, `plugin pane open --placement split`, `pane send-text/send-keys/read`):
+link, action invoke with correct pane cwd, begin from brief, NOT PROVIDED,
+same-snapshot after a CLI check using the printed shared state directory, log
+view, stale after editing a tracked file, diff showing the change, exit-7 check
+recorded as exit 7 / same-snapshot, records persisting across reopen, second
+repository isolated, unlink clean. This run found and fixed one release blocker:
+pane commands execute with cwd = the reviewed repository, so the manifest must
+reference `panel.sh` through `$HERDR_PLUGIN_ROOT` (a relative path made the pane
+exit immediately). The default `popup` placement was not inspected visually
+(no TUI client was attached to the dev session); the same pane command was
+exercised with `split` placement. Linux and Python 3.11–3.13 remain untested.
+Marketplace discovery must be confirmed separately after publication.
 
 ## Before promoting beyond alpha
 

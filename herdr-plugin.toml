@@ -17,4 +17,6 @@ title = "Review Pack"
 placement = "popup"
 width = "90%"
 height = "85%"
-command = ["sh", "panel.sh"]
+# Pane commands run with cwd = the reviewed repository, so the script must be
+# addressed through HERDR_PLUGIN_ROOT (verified live on Herdr 0.9.0).
+command = ["sh", "-c", "exec sh \"$HERDR_PLUGIN_ROOT/panel.sh\""]

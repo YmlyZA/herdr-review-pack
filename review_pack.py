@@ -18,7 +18,6 @@ import time
 import uuid
 
 VERSION = "0.1.0"
-MAX_BYTES = 64 * 1024 * 1024
 LOG_LIMIT = 2 * 1024 * 1024
 
 
@@ -44,36 +43,63 @@ def root(path):
 
 
 def snapshot(repo):
-    """Conservative content fingerprint; fail rather than silently skip unsupported data."""
+    """Conservative content fingerprint; fail rather than silently skip unsupported data.
+
+    File contents are hashed by one `git hash-object --stdin-paths` call (no
+    object-database writes, no Python-side reads), so a snapshot costs roughly
+    one `git status`. Symlinks hash their target string; deletions are explicit.
+    """
     head = git(repo, "rev-parse", "--verify", "HEAD^{commit}").decode().strip()
     index = git(repo, "ls-files", "--stage", "-z")
     if any(row.startswith(b"160000 ") for row in index.split(b"\0")):
         raise ValueError("Submodules are unsupported in v0; no freshness claim can be made.")
     paths = sorted(set(git(repo, "ls-files", "-z", "--cached", "--others", "--exclude-standard").split(b"\0")) - {b""})
-    h = hashlib.sha256(b"review-pack-v1\0" + head.encode() + b"\0" + index)
-    total = 0
+    entries = {}
+    regular = []
     for raw in paths:
         p = repo / os.fsdecode(raw)
         try:
             st = p.lstat()
         except FileNotFoundError:
-            mode, content = b"deleted", b""
+            entries[raw] = (b"deleted", b"")
+            continue
+        mode = str(stat.S_IFMT(st.st_mode) | (st.st_mode & 0o111)).encode()
+        if stat.S_ISLNK(st.st_mode):
+            entries[raw] = (mode, os.fsencode(os.readlink(p)))
+        elif stat.S_ISREG(st.st_mode):
+            entries[raw] = (mode, None)
+            regular.append(raw)
         else:
-            mode = str(stat.S_IFMT(st.st_mode) | (st.st_mode & 0o111)).encode()
-            if stat.S_ISLNK(st.st_mode):
-                content = os.fsencode(os.readlink(p))
-            elif stat.S_ISREG(st.st_mode):
-                if st.st_size + total > MAX_BYTES:
-                    raise ValueError("Snapshot exceeds 64 MiB. v0 refuses a partial fingerprint.")
-                content = p.read_bytes()
-            else:
-                raise ValueError("Unsupported tracked/untracked path: " + str(p))
-        total += len(content)
-        if total > MAX_BYTES:
-            raise ValueError("Snapshot exceeds 64 MiB.")
+            raise ValueError("Unsupported tracked/untracked path: " + str(p))
+    if regular:
+        # --stdin-paths is newline separated; a path containing a newline gets its own call.
+        batch = [r for r in regular if b"\n" not in r]
+        single = [r for r in regular if b"\n" in r]
+        hashes = []
+        if batch:
+            hashes = hash_paths(repo, b"\n".join(batch) + b"\n", stdin_paths=True)
+            if len(hashes) != len(batch):
+                raise ValueError("Worktree changed while hashing; retry after the writer stops.")
+        for raw in single:
+            hashes.append(hash_paths(repo, None, path=raw)[0])
+        for raw, blob in zip(batch + single, hashes):
+            entries[raw] = (entries[raw][0], blob)
+    h = hashlib.sha256(b"review-pack-v2\0" + head.encode() + b"\0" + index)
+    for raw in paths:
+        mode, content = entries[raw]
         for part in (raw, mode, content):
             h.update(len(part).to_bytes(8, "big")); h.update(part)
     return {"digest": h.hexdigest(), "head": head, "files": len(paths)}
+
+
+def hash_paths(repo, stdin, stdin_paths=False, path=None):
+    argv = ["git", "--no-pager", "-C", str(repo), "hash-object", "--no-filters"]
+    argv += ["--stdin-paths"] if stdin_paths else ["--", os.fsdecode(path)]
+    proc = subprocess.run(argv, input=stdin, capture_output=True, timeout=300,
+                          env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
+    if proc.returncode:
+        raise ValueError("git hash-object failed: " + proc.stderr.decode(errors="replace").strip())
+    return proc.stdout.split()
 
 
 def stable_snapshot(repo):
@@ -392,7 +418,11 @@ def main(argv=None):
                 raise ValueError("Timeout must be a finite positive number.")
             command = args.command[1:] if args.command[:1] == ["--"] else args.command
             r = run_check(repo, store, command, args.timeout)
-            print(json.dumps(r, indent=2))
+            # One human/agent-readable line on stdout; the full receipt on stderr so a
+            # calling agent does not mistake the JSON dump for the command's own output.
+            print(f"review-pack receipt {r['id']}: outcome={r['outcome']} exit_code={r['exit_code']} "
+                  f"duration={r['duration_seconds']}s log={store / r['task_id'] / r['log']}")
+            print(json.dumps(r, indent=2), file=sys.stderr)
             return (r["exit_code"] if r["exit_code"] is not None and 0 <= r["exit_code"] <= 255 else 1) if r["outcome"] == "exited" else 1
         elif args.action == "pack":
             print(report(repo, store))
