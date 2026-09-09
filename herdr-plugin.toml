@@ -1,0 +1,20 @@
+id = "herdr-review-pack"
+name = "Review Pack"
+version = "0.1.0"
+min_herdr_version = "0.9.0"
+platforms = ["macos", "linux"]
+description = "Prepare a local review packet with task intent, Git diff, and snapshot-bound check receipts."
+
+[[actions]]
+id = "open"
+title = "Review Pack: open"
+contexts = ["pane", "workspace"]
+command = ["python3", "review_pack.py", "open"]
+
+[[panes]]
+id = "review"
+title = "Review Pack"
+placement = "popup"
+width = "90%"
+height = "85%"
+command = ["sh", "panel.sh"]
