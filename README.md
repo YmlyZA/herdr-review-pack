@@ -31,7 +31,7 @@ input, not an inferred summary of a conversation.
 Public alpha source: [YmlyZA/herdr-review-pack](https://github.com/YmlyZA/herdr-review-pack).
 
 ```sh
-herdr plugin install YmlyZA/herdr-review-pack
+herdr plugin install YmlyZA/herdr-review-pack      # add --yes when stdin is not a terminal
 herdr plugin action invoke herdr-review-pack.open
 ```
 

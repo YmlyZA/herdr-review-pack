@@ -18,6 +18,9 @@ reference `panel.sh` through `$HERDR_PLUGIN_ROOT` (a relative path made the pane
 exit immediately). The default `popup` placement was not inspected visually
 (no TUI client was attached to the dev session); the same pane command was
 exercised with `split` placement. Linux and Python 3.11–3.13 remain untested.
+Installing from GitHub (`herdr plugin install YmlyZA/herdr-review-pack --yes`,
+commit dad1b50) was verified in the same dev session: install preview shows the
+manifest, the pane opens, the action runs, uninstall leaves no plugin or pane.
 Marketplace discovery must be confirmed separately after publication.
 
 ## Before promoting beyond alpha
